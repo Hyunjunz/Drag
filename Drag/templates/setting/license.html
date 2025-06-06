@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>프로필 설정 | Drag</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+
+  <style>
+    :root {
+      --primary-color: #4361ee;
+      --secondary-color: #3f37c9;
+      --accent-color: #4895ef;
+      --dark-color: #1b263b;
+      --light-color: #f8f9fa;
+      --success-color: #4cc9f0;
+      --danger-color: #f72585;
+      --text-dark: #212529;
+      --text-light: #6c757d;
+      --border-radius: 12px;
+      --box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      --transition: all 0.3s ease;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+
+    body {
+      background-color: #f5f7fa;
+      color: var(--text-dark);
+    }
+
+    logoFont {
+      font-family: 'Bagel Fat One', cursive;
+    }
+
+    .app-container {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      min-height: 100vh;
+    }
+
+    /* 사이드바 스타일 */
+    .sidebar {
+      background: white;
+      padding: 30px 0;
+      border-right: 1px solid #e9ecef;
+      color: black;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+    }
+
+    .sidebar h2 {
+      padding: 0 25px 20px;
+      font-size: 1.5rem;
+      color: var(--dark-color);
+      border-bottom: 1px solid #f1f3f5;
+    }
+
+    .sidebar ul {
+      list-style: none;
+      margin-top: 20px;
+    }
+
+    .sidebar li {
+      padding: 15px 25px;
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar li:before {
+      content: "•";
+      color: var(--primary-color);
+      font-size: 1.2rem;
+      opacity: 0;
+      transition: var(--transition);
+    }
+
+    .sidebar li:hover {
+      background: #f8f9fa;
+      padding-left: 30px;
+    }
+
+    .sidebar li:hover:before {
+      opacity: 1;
+    }
+
+    .sidebar li.selected {
+      background: var(--primary-color);
+      color: white;
+      border-radius: 0 var(--border-radius) var(--border-radius) 0;
+    }
+
+    .sidebar li.selected:before {
+      opacity: 1;
+      color: white;
+    }
+
+    /* 메인 콘텐츠 영역 */
+    .main-content {
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .topbar {
+      display: none; /* 모바일에서만 표시 */
+    }
+
+    /* 섹션 스타일 */
+    section {
+      background: white;
+      border-radius: var(--border-radius);
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: var(--box-shadow);
+    }
+
+    section h2 {
+      font-size: 1.3rem;
+      margin-bottom: 25px;
+      color: var(--dark-color);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    section h2:before {
+      content: "";
+      display: block;
+      width: 4px;
+      height: 20px;
+      background: var(--primary-color);
+      border-radius: 2px;
+    }
+
+    /* 프로필 이미지 */
+    .image-wrapper {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin: 20px auto;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 3px solid white;
+      box-shadow: var(--box-shadow);
+      transition: var(--transition);
+    }
+
+    .profile-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      padding: 10px;
+      text-align: center;
+      transform: translateY(100%);
+      transition: var(--transition);
+    }
+
+    .image-wrapper:hover .overlay {
+      transform: translateY(0);
+    }
+
+    /* 입력 폼 스타일 */
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: var(--text-dark);
+    }
+
+    .clean-text-input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 1px solid #e9ecef;
+      border-radius: var(--border-radius);
+      font-size: 1rem;
+      transition: var(--transition);
+    }
+
+    .clean-text-input:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+      outline: none;
+    }
+
+    /* 버튼 스타일 */
+    .clean-button {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: var(--border-radius);
+      font-size: 1rem;
+      cursor: pointer;
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .clean-button:hover {
+      background: var(--secondary-color);
+      transform: translateY(-2px);
+    }
+
+    /* 토글 스위치 */
+    .switch-block {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 0;
+      border-bottom: 1px solid #f1f3f5;
+    }
+
+    .switch-block span {
+      font-size: 0.95rem;
+    }
+
+    input[type="checkbox"] {
+      display: none;
+    }
+
+    input[type="checkbox"] + label {
+      display: inline-block;
+      width: 50px;
+      height: 26px;
+      background: #e9ecef;
+      border-radius: 13px;
+      position: relative;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    input[type="checkbox"] + label:after {
+      content: "";
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: var(--transition);
+    }
+
+    input[type="checkbox"]:checked + label {
+      background: var(--primary-color);
+    }
+
+    input[type="checkbox"]:checked + label:after {
+      left: 27px;
+    }
+
+    /* 커스텀 셀렉트 */
+    .custom-select-wrapper {
+      position: relative;
+      width: 200px;
+      margin-top: 15px;
+    }
+
+    .custom-select-display {
+      padding: 12px 15px;
+      border: 1px solid #e9ecef;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: var(--transition);
+    }
+
+    .custom-select-display:after {
+      content: "▼";
+      font-size: 0.7rem;
+      color: var(--text-light);
+      transition: var(--transition);
+    }
+
+    .custom-select-wrapper.open .custom-select-display:after {
+      transform: rotate(180deg);
+    }
+
+    .custom-select-wrapper.open .custom-select-display {
+      border-color: var(--primary-color);
+    }
+
+    .custom-select-options {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #e9ecef;
+      border-radius: 0 0 var(--border-radius) var(--border-radius);
+      list-style: none;
+      max-height: 0;
+      overflow: hidden;
+      transition: var(--transition);
+      z-index: 10;
+      box-shadow: var(--box-shadow);
+    }
+
+    .custom-select-wrapper.open .custom-select-options {
+      max-height: 300px;
+      border-top: none;
+    }
+
+    .custom-select-options li {
+      padding: 10px 15px;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .custom-select-options li:hover {
+      background: #f8f9fa;
+    }
+
+    /* 반응형 디자인 */
+    @media (max-width: 768px) {
+      .app-container {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none; /* 모바일에서는 사이드바 숨김 */
+      }
+
+      .topbar {
+        display: flex;
+        padding: 15px;
+        background: white;
+        border-bottom: 1px solid #e9ecef;
+      }
+
+      .main-content {
+        padding: 20px;
+      }
+
+      .image-wrapper {
+        width: 100px;
+        height: 100px;
+      }
+    }
+
+    /* 애니메이션 */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    section {
+      animation: fadeIn 0.4s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <h2><logoFont>Drag</logoFont></h2>
+      <ul>
+        <li onclick="window.location.href = '/profile'">프로필 및 계정</li>
+        <li>오디오 및 비디오</li>
+        <li>개인정보</li>
+        <li>접근성</li>
+        <li>단축키</li>
+        <li class="selected">라이선스</li>
+      </ul>
+    </aside>
+    <main class="main-content">
+      <section>
+        <h2>라이선스</h2>
+        <p><a href="/license-DCLA">Drag Chat License Agreement (DCLA)</a></p>
+        <p>Drag Alpha release Ver 0.3.2 Build 0081</p>
+        <p>Copyright 2025. Drag(Hyeonjun). All rights reserved.</p>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

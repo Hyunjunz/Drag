@@ -1,0 +1,58 @@
+.profile-modal h2 {
+  font-size: 24px;
+  margin-bottom: 16px;
+  font-weight: bold;
+}
+
+.profile-modal label {
+  display: block;
+  margin-top: 16px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.profile-modal input[type="text"],
+.profile-modal input[type="file"] {
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 6px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #fff;
+  color: #000;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.button-area {
+  margin-top: 24px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.save-button, .cancel-button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.save-button {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.save-button:hover {
+  background-color: #388e3c;
+}
+
+.cancel-button {
+  background-color: #aaa;
+  color: white;
+}
+
+.cancel-button:hover {
+  background-color: #888;
+}

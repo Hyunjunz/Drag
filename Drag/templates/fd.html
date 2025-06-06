@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drag - 친구</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <meta name="username" content="{{ username }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
+    <script>
+        function setupCSRF() {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+            $.ajaxSetup({
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+        }
+        setupCSRF();
+
+        function openProfile() {
+            window.open("/profile");
+        }
+
+        // 친구 목록 관련 기능
+        document.addEventListener('DOMContentLoaded', function () {
+            // 탭 전환
+            const tabs = document.querySelectorAll('.friend-tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function () {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+
+            // 친구 검색 기능
+            const searchInput = document.getElementById('friend-search');
+            searchInput.addEventListener('input', function () {
+                const searchTerm = this.value.toLowerCase();
+                const friendItems = document.querySelectorAll('.friend-item');
+
+                friendItems.forEach(item => {
+                    const friendName = item.querySelector('.friend-name').textContent.toLowerCase();
+                    if (friendName.includes(searchTerm)) {
+                        item.style.display = 'flex';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+
+            // 친구 선택 이벤트
+            const friendItems = document.querySelectorAll('.friend-item');
+            friendItems.forEach(item => {
+                item.addEventListener('click', function () {
+                    const friendName = this.querySelector('.friend-name').textContent;
+                    const friendStatus = this.querySelector('.friend-status').textContent;
+                    const statusType = this.querySelector('.status-indicator').classList[1].split('-')[1];
+
+                    // 친구 상세 정보 업데이트
+                    document.querySelector('.friend-detail-name').textContent = friendName;
+                    document.querySelector('.friend-detail-status').textContent = friendStatus;
+
+                    // 상태 표시 업데이트
+                    const statusIndicator = document.querySelector('.friend-detail-avatar .status-indicator');
+                    statusIndicator.className = 'status-indicator';
+                    statusIndicator.classList.add(`status-${statusType}`);
+
+                    // 애니메이션 효과
+                    this.style.animation = 'none';
+                    setTimeout(() => {
+                        this.style.animation = 'fadeIn 0.3s ease-out';
+                    }, 10);
+                });
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- 좌측 사이드바 -->
+        <div class="sidebar">
+            <h2>DRAG</h2>
+            <ul>
+                <li onclick="window.location.href = '/home'"><i class="fas fa-comments"></i><br>채팅</li>
+                <li class="active"><i class="fas fa-user-friends"></i><br>친구</li>
+                <li><i class="fas fa-bell"></i><br>알림</li>
+                <li><i class="fas fa-cog"></i><br>설정</li>
+            </ul>
+        </div>
+
+        <!-- 중간 영역 - 친구 목록 -->
+        <div class="friends-menu">
+            <div class="friends-header">
+                <h3>친구 목록</h3>
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="friend-search" placeholder="친구 검색">
+                </div>
+                <div class="friend-tabs">
+                    <div class="friend-tab active" data-tab="all">전체 친구</div>
+                    <div class="friend-tab" data-tab="online">온라인</div>
+                    <div class="friend-tab" data-tab="idle">대기중</div>
+                    <div class="friend-tab" data-tab="offline">오프라인</div>
+                </div>
+            </div>
+
+            <div class="friends-list" id="friends-list">
+                <!-- 친구 목록 동적 렌더링 -->
+            </div>
+        </div>
+        <script>
+            let socket;
+            function getCSRFToken() {
+                return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            }
+
+            function sendFriendRequest(friendId) {
+                fetch(`/friend/request/${friendId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    credentials: 'include'
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.text().then(text => { throw new Error(text); });
+                        }
+                        return response.text();
+                    })
+                    .then(data => {
+                        alert('요청이 성공적으로 전송되었습니다.');
+                    })
+                    .catch(error => {
+                        alert(`오류: ${error.message}`);
+                    });
+            }
+        </script>
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const listContainer = document.getElementById('friends-list');
+                const searchInput = document.getElementById('friend-search');
+                const tabs = document.querySelectorAll('.friend-tab');
+
+                let allFriends = [];
+                let pendingRequests = [];
+
+                function renderFriends() {
+                    listContainer.innerHTML = '';
+
+                    // 친구 상태별 분류
+                    const grouped = {
+                        online: [],
+                        idle: [],
+                        offline: [],
+                        pending: []  // 대기중 요청
+                    };
+
+                    // accepted 친구들
+                    allFriends.forEach(friend => {
+                        if (grouped[friend.status]) {
+                            grouped[friend.status].push(friend);
+                        } else {
+                            grouped['offline'].push(friend);
+                        }
+                    });
+
+                    // 대기중 요청은 status를 pending으로 강제 지정
+                    pendingRequests.forEach(req => {
+                        grouped['pending'].push({ ...req, status: 'pending' });
+                    });
+
+                    const currentTab = document.querySelector('.friend-tab.active').dataset.tab;
+
+                    const statusMap = {
+                        online: '온라인',
+                        idle: '대기중',
+                        offline: '오프라인',
+                        pending: '친구 요청'
+                    };
+
+                    Object.entries(grouped).forEach(([status, users]) => {
+                        if (users.length === 0) return;
+                        if (currentTab !== 'all' && currentTab !== status) return;
+
+                        const category = document.createElement('div');
+                        category.className = 'friend-category';
+                        category.textContent = `${statusMap[status]} - ${users.length}명`;
+                        listContainer.appendChild(category);
+
+                        users.forEach(user => {
+                            if (searchInput.value && !user.username.includes(searchInput.value)) return;
+
+                            const item = document.createElement('div');
+                            item.className = 'friend-item';
+
+                            // pending일 경우 수락/거절 버튼 추가 예시
+                            let actionsHtml = `
+                  <div class="friend-action"><i class="fas fa-comment"></i></div>
+                  <div class="friend-action"><i class="fas fa-phone"></i></div>
+                `;
+
+                            if (status === 'pending') {
+                                actionsHtml = `
+                      <button onclick="acceptFriend(${user.id})">수락</button>
+                      <button onclick="rejectFriend(${user.id})">거절</button>
+                    `;
+                            }
+
+                            item.innerHTML = `
+                  <div class="friend-avatar">
+                    <i class="fas fa-user"></i>
+                    <div class="status-indicator status-${user.status}"></div>
+                  </div>
+                  <div class="friend-info">
+                    <div class="friend-name">${user.username}</div>
+                    <div class="friend-status">${user.description || ''}</div>
+                  </div>
+                  <div class="friend-actions">
+                    ${actionsHtml}
+                  </div>
+                `;
+                            listContainer.appendChild(item);
+                        });
+                    });
+                }
+
+                function fetchFriends() {
+                    fetch('/friends')
+                        .then(res => res.json())
+                        .then(data => {
+                            allFriends = data.friends;
+                            pendingRequests = data.requests;
+                            renderFriends();
+                        });
+                }
+
+                searchInput.addEventListener('input', () => {
+                    renderFriends();
+                });
+
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        renderFriends();
+                    });
+                });
+
+                // 수락 API 호출 예시
+                window.acceptFriend = function (friendId) {
+                    fetch(`/friend/accept/${friendId}`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': getCSRFToken() },
+                        credentials: 'include'
+                    })
+                        .then(res => {
+                            if (!res.ok) throw new Error('수락 실패');
+                            return res.text();
+                        })
+                        .then(() => {
+                            alert('친구 요청을 수락했습니다.');
+                            fetchFriends();
+                        })
+                        .catch(err => alert(err.message));
+                };
+
+                // 거절 API 호출 (친구 요청 삭제)
+                window.rejectFriend = function (friendId) {
+                    fetch(`/friend/remove/${friendId}`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': getCSRFToken() },
+                        credentials: 'include'
+                    })
+                        .then(res => {
+                            if (!res.ok) throw new Error('거절 실패');
+                            return res.text();
+                        })
+                        .then(() => {
+                            alert('친구 요청을 거절했습니다.');
+                            fetchFriends();
+                        })
+                        .catch(err => alert(err.message));
+                };
+                function initializeSocket() {
+
+                    if (socket) {
+                        socket.disconnect();
+                    }
+
+                    socket = io.connect(window.location.origin, {
+                        reconnection: true,
+                        reconnectionAttempts: Infinity,
+                        reconnectionDelay: 1000,
+                        reconnectionDelayMax: 5000,
+                        transports: ['polling'],
+                        upgrade: false
+                    });
+
+                    socket.on('connect', function () {
+                        console.log('Socket connected:', socket.id);
+                        if (currentChatId) {
+                            socket.emit('join_chat', { chat_id: currentChatId });
+                        }
+                        loadInitialData();
+                    });
+
+                    socket.on('disconnect', function (reason) {
+                        console.log('Socket disconnected:', reason);
+                        if (reason === 'io server disconnect') {
+                            socket.connect();
+                        }
+                    });
+                    socket.on('status_update', (data) => {
+                        console.log('상태 변경 감지:', data);
+                        fetchFriends();
+                    });
+                }
+                initializeSocket();
+                fetchFriends();
+            });
+
+
+        </script>
+
+        <!-- 메인 영역 - 친구 상세 정보 -->
+        <div class="main-content">
+            <div class="topbar">
+                <div class="title"><span>DRAG</span></div>
+                <div class="profile-area">
+                    <div class="profile-name">
+                        <button onclick="openProfile()">{{ username }}</button>
+                    </div>
+                    <button class="settings-button">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="friend-detail">
+                <div class="friend-detail-avatar">
+                    <i class="fas fa-user"></i>
+                    <div class="status-indicator status-online"></div>
+                </div>
+                <h2 class="friend-detail-name">유저1</h2>
+                <p class="friend-detail-status">유저1 설명</p>
+
+                <div class="friend-meta">
+                    <div class="friend-meta-item">
+                        <div class="friend-meta-value">42</div>
+                        <div class="friend-meta-label">친구</div>
+                    </div>
+                    <div class="friend-meta-item">
+                        <div class="friend-meta-value">1,238</div>
+                        <div class="friend-meta-label">게시물</div>
+                    </div>
+                    <div class="friend-meta-item">
+                        <div class="friend-meta-value">3</div>
+                        <div class="friend-meta-label">그룹</div>
+                    </div>
+                </div>
+
+                <div class="friend-actions-large">
+                    <button class="friend-action-large friend-action-chat">
+                        <i class="fas fa-comment"></i> 메시지 보내기
+                    </button>
+                    <button class="friend-action-large friend-action-call">
+                        <i class="fas fa-phone"></i> 통화하기
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 기본적으로 첫 번째 친구를 선택한 상태로 표시
+        document.addEventListener('DOMContentLoaded', function () {
+            const firstFriend = document.querySelector('.friend-item');
+            if (firstFriend) {
+                firstFriend.click();
+            }
+        });
+    </script>
+</body>
+
+</html>

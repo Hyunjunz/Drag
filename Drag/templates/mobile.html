@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Drag - 모바일 채팅</title>
+
+    <!-- 필요한 라이브러리 -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- CSRF 토큰 설정 -->
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <meta name="username" content="{{ username }}">
+
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --primary-light: #e6e9ff;
+            --secondary-color: #3f37c9;
+            --accent-color: #4895ef;
+            --dark-color: #1b263b;
+            --light-color: #f8f9fa;
+            --success-color: #4cc9f0;
+            --danger-color: #f72585;
+            --text-dark: #212529;
+            --text-light: #6c757d;
+            --border-radius: 12px;
+            --box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: var(--text-dark);
+            height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* 앱 컨테이너 */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* 헤더 스타일 */
+        .header {
+            background: white;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e9ecef;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+            z-index: 10;
+            position: sticky;
+            top: 0;
+        }
+
+        .header-title {
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--primary-color);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .header-button {
+            background: none;
+            border: none;
+            font-size: 1.1rem;
+            color: var(--text-dark);
+            cursor: pointer;
+        }
+
+        /* 탭 바 */
+        .tab-bar {
+            display: flex;
+            background: white;
+            border-bottom: 1px solid #e9ecef;
+            position: sticky;
+            top: 56px;
+            z-index: 9;
+        }
+
+        .tab-item {
+            flex: 1;
+            text-align: center;
+            padding: 12px 0;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-light);
+            position: relative;
+        }
+
+        .tab-item.active {
+            color: var(--primary-color);
+        }
+
+        .tab-item.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40%;
+            height: 3px;
+            background: var(--primary-color);
+            border-radius: 3px 3px 0 0;
+        }
+
+        /* 채팅 목록 */
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .chat-item {
+            display: flex;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            background: white;
+            transition: background 0.2s;
+        }
+
+        .chat-item:active {
+            background: #f8f9fa;
+        }
+
+        .chat-item.unread {
+            background: #f8fbff;
+        }
+
+        .chat-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            color: var(--primary-color);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .chat-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .chat-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chat-time {
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .chat-preview {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chat-preview.unread {
+            color: var(--text-dark);
+            font-weight: 500;
+        }
+
+        .chat-badge {
+            background: var(--primary-color);
+            color: white;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            min-width: 18px;
+            text-align: center;
+            margin-left: 4px;
+        }
+
+        /* 채팅 화면 */
+        .chat-screen {
+            display: none;
+            flex-direction: column;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            z-index: 100;
+        }
+
+        .chat-screen.active {
+            display: flex;
+        }
+
+        .chat-header {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #f0f0f0;
+            background: white;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .back-button {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            margin-right: 12px;
+            color: var(--primary-color);
+        }
+
+        .chat-title {
+            flex: 1;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .chat-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* 메시지 영역 */
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 16px;
+            -webkit-overflow-scrolling: touch;
+            background: #f5f7fa;
+        }
+
+        .message {
+            margin-bottom: 12px;
+            max-width: 80%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            position: relative;
+            word-break: break-word;
+            animation: fadeIn 0.3s ease-out;
+            line-height: 1.4;
+            font-size: 0.95rem;
+        }
+
+        .message:not(.my-message) {
+            background: white;
+            border-top-left-radius: 4px;
+            align-self: flex-start;
+            border: 1px solid #e9ecef;
+        }
+
+        .message.my-message {
+            background: var(--primary-color);
+            color: white;
+            border-top-right-radius: 4px;
+            margin-left: auto;
+            /* 오른쪽 정렬 */
+        }
+
+
+        .message strong {
+            display: block;
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+            color: var(--text-light);
+            font-weight: 600;
+        }
+
+        .message.my-message strong {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .message small {
+            font-size: 0.7rem;
+            color: var(--text-light);
+            display: block;
+            text-align: right;
+            margin-top: 4px;
+        }
+
+        .message.my-message small {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* 메시지 입력 영역 */
+        .chat-input {
+            display: flex;
+            gap: 8px;
+            background: white;
+            padding: 12px 16px;
+            border-top: 1px solid #e9ecef;
+            align-items: center;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid #e9ecef;
+            border-radius: 20px;
+            outline: none;
+            transition: all 0.3s;
+            resize: none;
+            min-height: 40px;
+            max-height: 120px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        #message-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        #send-button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #send-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 애니메이션 */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 스크롤바 */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(241, 241, 241, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(193, 193, 193, 0.6);
+            border-radius: 2px;
+        }
+
+        /* 멤버 목록 */
+        .member-list {
+            padding: 16px;
+            background: white;
+        }
+
+        .member-list h5 {
+            margin-bottom: 12px;
+            font-size: 1rem;
+        }
+
+        .member-list ul {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .member-list li {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background-color: #f8f9fa;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            font-size: 0.85rem;
+        }
+
+        /* 모달 */
+        .modal-content {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-header {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .modal-footer {
+            border-top: none;
+            padding-top: 0;
+        }
+
+        /* 반응형 조정 */
+        @media (max-width: 360px) {
+            .chat-item {
+                padding: 10px 12px;
+            }
+
+            .chat-avatar {
+                width: 42px;
+                height: 42px;
+                margin-right: 10px;
+            }
+
+            #message-input {
+                padding: 8px 12px;
+            }
+        }
+
+        /* 상태 표시기 */
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .status-online {
+            background: #28a745;
+        }
+
+        .status-offline {
+            background: #6c757d;
+        }
+
+        /* 빈 상태 */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 60vh;
+            text-align: center;
+            padding: 0 20px;
+            color: var(--text-light);
+        }
+
+        .empty-icon {
+            font-size: 2.5rem;
+            color: #dee2e6;
+            margin-bottom: 12px;
+        }
+
+        .empty-text {
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- 채팅 목록 화면 -->
+        <div id="chat-list-view">
+            <!-- 헤더 -->
+            <header class="header">
+                <div class="header-title">채팅</div>
+                <div class="header-actions">
+                    <button class="header-button" onclick="openProfile()">
+                        <i class="fas fa-user"></i>
+                    </button>
+                    <button class="header-button" onclick="location.href='{{ url_for('logout') }}'">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- 탭 바 -->
+            <div class="tab-bar">
+                <div class="tab-item active">채팅</div>
+                <div class="tab-item">친구</div>
+                <div class="tab-item">그룹</div>
+            </div>
+
+            <!-- 채팅 목록 -->
+            <div class="chat-list">
+                {% if chats %}
+                {% for chat in chats %}
+                <div class="chat-item {% if selected_chat and selected_chat.id == chat.id %}active{% endif %}"
+                    onclick="openChat('{{ chat.id }}', '{{ chat.name }}')">
+                    <div class="chat-avatar">{{ chat.name|first|upper }}</div>
+                    <div class="chat-content">
+                        <div class="chat-header">
+                            <div class="chat-name">{{ chat.name }}</div>
+                            <div class="chat-time">{{ chat.last_message_time|default('', true) }}</div>
+                        </div>
+                        <div class="chat-preview {% if chat.unread_count %}unread{% endif %}">
+                            {{ chat.last_message|default('메시지가 없습니다', true)|truncate(30) }}
+                            {% if chat.unread_count %}
+                            <span class="chat-badge">{{ chat.unread_count }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="far fa-comment-dots"></i>
+                    </div>
+                    <div class="empty-text">
+                        <h4>채팅이 없습니다</h4>
+                        <p>새로운 채팅을 시작해보세요</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 새 채팅 버튼 -->
+            <button class="fab-button" onclick="showNewChatModal()">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+
+        <!-- 채팅 화면 (처음에는 숨김) -->
+        <div id="chat-screen" class="chat-screen">
+            <!-- 채팅 헤더 -->
+            <div class="chat-header">
+                <button class="back-button" onclick="closeChat()">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="chat-title" id="chat-title">채팅방</div>
+                <div class="chat-actions">
+                    <button class="header-button" id="chat-info-button">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 멤버 목록 (숨김 상태) -->
+            <div class="member-list" id="member-list" style="display: none;">
+                <h5>멤버 목록</h5>
+                <ul id="member-list-items">
+                    <!-- 멤버 목록이 여기에 동적으로 로드됩니다 -->
+                </ul>
+                {% if is_admin %}
+                <button type="button" class="btn btn-primary btn-sm mt-2" onclick="showAddMemberModal()">
+                    멤버 추가하기
+                </button>
+                {% endif %}
+            </div>
+
+            <!-- 메시지 영역 -->
+            <div class="messages" id="chat-box">
+                {% if selected_chat and messages %}
+                {% for message in messages %}
+                <div class="message {% if message.sender.username == username %}my-message{% endif %}">
+                    {% if not loop.previtem or loop.previtem.sender.username != message.sender.username %}
+                    <strong>{{ message.sender.username }}</strong>
+                    {% endif %}
+                    <div class="message-content">{{ message.content }}</div>
+                    <small>{{ message.timestamp.strftime('%H:%M') }}</small>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="far fa-comments"></i>
+                    </div>
+                    <div class="empty-text">
+                        <h4>대화를 시작해보세요!</h4>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 메시지 입력 영역 -->
+            <div class="chat-input">
+                <textarea id="message-input" placeholder="메시지를 입력하세요..." rows="1"></textarea>
+                <button id="send-button" onclick="sendMessage()">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 새 채팅 모달 -->
+    <div class="modal fade" id="newChatModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">새 채팅 생성</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="newChatForm" onsubmit="createNewChat(event)">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="chatName" class="form-label">채팅 이름</label>
+                            <input type="text" class="form-control" id="chatName" name="chat_name" required>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="isPrivate" name="is_private">
+                            <label class="form-check-label" for="isPrivate">비공개 채팅방</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                        <button type="submit" class="btn btn-primary">생성</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 멤버 추가 모달 -->
+    <div class="modal fade" id="addMemberModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">멤버 추가</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="addMemberForm" onsubmit="addMember(event)">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="memberUsername" class="form-label">사용자 이름</label>
+                            <input type="text" class="form-control" id="memberUsername" name="username" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                        <button type="submit" class="btn btn-primary">추가</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+    </div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+        <button type="submit" class="btn btn-primary">추가</button>
+    </div>
+    </form>
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        window.addEventListener('popstate', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const chatId = urlParams.get('chat_id');
+            if (chatId) {
+                loadChatMessages(chatId);
+                initializeSocket(chatId);
+            } else {
+                showEmptyChatState();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            init();
+        });
+
+
+        function init() {
+            let currentChatId = null;
+            let socket = null;
+            const currentUsername = getCurrentUsername();
+
+            const urlParams = new URLSearchParams(window.location.search);
+            currentChatId = urlParams.get('chat_id');
+            console.log('currentChatId:', currentChatId);
+
+            if (currentChatId) {
+                loadChatMessages(currentChatId);
+                initializeSocket(currentChatId);
+            } else {
+                showEmptyChatState('채팅방을 선택해주세요.');
+            }
+
+            setupEventListeners();
+
+            function getCurrentUsername() {
+                const metaUsername = document.querySelector('meta[name="username"]')?.content;
+                return metaUsername || '';
+            }
+
+            function loadChatMessages(chatId) {
+                console.log('Loading messages for chat:', chatId);
+                fetch(`/api/chat/${chatId}/messages`)
+                    .then(response => {
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        if (response.status === 403) {
+                            alert("접근 권한이 없습니다.");
+                            throw new Error('Forbidden');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        const chatBox = document.getElementById('chat-box');
+                        if (!chatBox) return;
+                        chatBox.innerHTML = '';
+
+                        if (data.messages && data.messages.length > 0) {
+                            data.messages.forEach(msg => {
+                                addMessageToChat(msg.content, msg.sender, msg.timestamp, false);
+                            });
+                        } else {
+                            showEmptyChatState('메시지가 없습니다.');
+                        }
+
+                        scrollToBottom();
+                    })
+                    .catch(error => {
+                        console.error('Error loading messages:', error);
+                        showEmptyChatState('메시지를 불러오는 중 오류가 발생했습니다.');
+                    });
+            }
+
+            function setupEventListeners() {
+                // 채팅방 클릭 시 changeChat 호출
+                const chatItems = document.querySelectorAll('.chat-item');
+                chatItems.forEach(item => {
+                    item.addEventListener('click', function () {
+                        const chatId = this.dataset.chatId;
+                        if (!chatId) return;
+                        changeChat(chatId);
+                    });
+                });
+
+                // popstate (뒤로가기 등) 이벤트 처리
+                window.addEventListener('popstate', function () {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const chatId = urlParams.get('chat_id');
+                    if (chatId) {
+                        changeChat(chatId, false);
+                    } else {
+                        clearChat();
+                        showEmptyChatState('채팅방을 선택해주세요.');
+                    }
+                });
+            }
+
+            function changeChat(chatId, pushState = true) {
+                if (!chatId) return;
+
+                currentChatId = chatId;
+                if (pushState) {
+                    const url = new URL(window.location);
+                    url.searchParams.set('chat_id', chatId);
+                    window.history.pushState({}, '', url);
+                }
+
+                clearChat();
+                loadChatMessages(chatId);
+                initializeSocket(chatId);
+            }
+
+            function initializeSocket(chatId) {
+                if (socket) {
+                    socket.disconnect();
+                    socket = null;
+                }
+
+                socket = io.connect(window.location.origin, {
+                    transports: ['polling'],
+                    upgrade: false
+                });
+
+                socket.on('connect', () => {
+                    console.log('Socket connected:', socket.id);
+                    socket.emit('join_chat', { chat_id: chatId });
+                });
+
+                socket.on('disconnect', (reason) => {
+                    console.log('Socket disconnected:', reason);
+                    if (reason === 'io server disconnect') socket.connect();
+                });
+
+                socket.on('new_message', (data) => {
+                    if (String(data.chat_id) === currentChatId) {
+                        addMessageToChat(data.message, data.sender, data.timestamp, false);
+                        scrollToBottom();
+                    } else {
+                        showNewMessageNotification(data.chat_id, data.sender, data.message);
+                    }
+                });
+
+                // typing 이벤트 등 기타 이벤트도 필요하면 추가하세요
+            }
+
+            function clearChat() {
+                const chatBox = document.getElementById('chat-box');
+                if (chatBox) chatBox.innerHTML = '';
+            }
+
+            function showEmptyChatState(message = '채팅 메시지가 없습니다.') {
+                const chatBox = document.getElementById('chat-box');
+                if (!chatBox) return;
+                chatBox.innerHTML = `<p class="empty-message">${message}</p>`;
+            }
+
+            function addMessageToChat(content, sender, timestamp, isOwnMessage = false) {
+                const chatBox = document.getElementById('chat-box');
+                if (!chatBox) return;
+
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message');
+                if (sender === currentUsername) {
+                    messageDiv.classList.add('my-message');
+                } else {
+                    messageDiv.classList.add('other-message');
+                }
+
+                const timeString = new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                messageDiv.innerHTML = `
+            <strong>${sender}</strong> ${escapeHtml(content)}
+            <div class="timestamp">${timeString}</div>
+        `;
+
+                chatBox.appendChild(messageDiv);
+                scrollToBottom();
+            }
+
+            function scrollToBottom() {
+                const chatBox = document.getElementById('chat-box');
+                if (!chatBox) return;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            // 알림 함수 등은 필요하면 추가하세요
+
+        }
+
+
+    </script>
+    <script>
+        function openProfile() {
+            window.open("/mprofile");
+        }
+    </script>
+    <script>
+        const currentUsername = "{{ username }}";
+    </script>
+
+    <script>
+        function showNewChatModal() {
+            const modalEl = document.getElementById('newChatModal');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
+
+        function openChat(chatId, chatName) {
+            const chatScreen = document.getElementById('chat-screen');
+            const chatListView = document.getElementById('chat-list-view');
+            const chatTitle = document.getElementById('chat-title');
+            
+            if (chatScreen && chatListView && chatTitle) {
+                chatScreen.classList.add('active');
+                chatListView.style.display = 'none';
+                chatTitle.textContent = chatName;
+
+                const url = new URL(window.location);
+                url.searchParams.set('chat_id', chatId);
+                window.history.pushState({}, '', url);
+
+                if (typeof loadChatMessages === 'function') {
+                    
+                    loadChatMessages(chatId);
+                }
+
+                document.querySelectorAll('.chat-item').forEach(item => {
+                    const id = item.getAttribute('onclick').match(/openChat\('(\d+)'/);
+                    if (id && id[1] === chatId) {
+                        item.classList.add('active');
+                        init();
+                    } else {
+                        item.classList.remove('active');
+                    }
+                });
+            }
+        }
+
+
+        function closeChat() {
+            const chatScreen = document.getElementById('chat-screen');
+            const chatListView = document.getElementById('chat-list-view');
+
+            if (chatScreen && chatListView) {
+                chatScreen.classList.remove('active');
+                chatListView.style.display = 'block';
+
+                // Remove chat_id from URL
+                const url = new URL(window.location);
+                url.searchParams.delete('chat_id');
+                window.history.pushState({}, '', url);
+            }
+        }
+    </script>
+
+</body>
+
+</html>

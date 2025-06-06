@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <!--TODO: SHIT-->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <meta name="csrf-token" content="{{ csrf_token }}">
+
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <script>
+    function setupCSRF() {
+      const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+      $.ajaxSetup({
+        headers: {
+          'X-CSRFToken': csrfToken
+        }
+      });
+    }
+
+    // 모든 AJAX 요청 전에 호출
+    setupCSRF();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drag - 채팅</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <meta name="username" content="{{ username }}">
+
+  <style>
+    
+    
+  </style>
+  <script>
+    function openProfile() {
+      window.open("/profile");
+    }
+  </script>
+</head>
+
+<body>
+  <div class="app-container">
+    <div class="sidebar">
+      <h2>DRAG</h2>
+      <ul>
+        <li class="active"><i class="fas fa-comments"></i><br>채팅</li>
+        <li onclick="window.location.href = '/fd'"><i class="fas fa-user-friends"></i><br>친구</li>
+        <li><i class="fas fa-bell"></i><br>알림</li>
+        <li><i class="fas fa-cog"></i><br>설정</li>
+      </ul>
+    </div>
+
+    <!-- 채팅 목록 -->
+    <div class="friends-menu">
+      <div class="friends-header">
+
+        <h3>채팅방</h3>
+        <div class="search-container">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="friend-search" placeholder="채팅방 검색">
+        </div>
+        <!-- 모달 열기 버튼 -->
+        <button type="button" class="friend-tab" data-bs-toggle="modal" data-bs-target="#newChatModal"
+          style="border-color: #0000;">
+          새 채팅 만들기
+        </button>
+
+        <div class="friend-tabs">
+          <div class="friend-tab active">전체 채팅</div>
+          <div class="friend-tab">그룹</div>
+          <div class="friend-tab">DM</div>
+        </div>
+      </div>
+      <div class="friends-list">
+        <!-- 그룹 채팅 표시 -->
+        <div class="friend-category">
+          그룹 - {{ chats | selectattr('is_private') | list | length }}
+        </div>
+        {% for chat in chats if chat.is_private %}
+        <div class="menu-item {% if selected_chat and selected_chat.id == chat.id %}active{% endif %}"
+          onclick="window.location.href='{{ url_for('home') }}?chat_id={{ chat.id }}'">
+          {{ chat.name }}
+          <i class="fas fa-lock"></i>
+        </div>
+        {% endfor %}
+
+        <!-- 비공개가 아닌 채팅 (DM 등) -->
+        <div class="friend-category">
+          기타 - {{ chats | rejectattr('is_private') | list | length }}
+        </div>
+        {% for chat in chats if not chat.is_private %}
+        <div class="menu-item {% if selected_chat and selected_chat.id == chat.id %}active{% endif %}"
+          onclick="window.location.href='{{ url_for('home') }}?chat_id={{ chat.id }}'">
+          {{ chat.name }}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+
+
+    <!-- 메인 채팅 영역 -->
+    <div class="main-content">
+      <div class="topbar">
+        <div class="title"><span>DRAG</span></div>
+        <div class="profile-area">
+          <div class="profile-name">
+            <button onclick="openProfile()">{{ username }}</button>
+          </div>
+          <button class="settings-button">
+            <i class="fas fa-cog"></i>
+          </button>
+          <button class="logout" onclick="logout()">
+            <i class="fas fa-cog"></i>
+          </button>
+        </div>
+      </div>
+      <script>
+        function logout() {
+          fetch('/logout', {
+            method: 'GET',
+            credentials: 'same-origin'  // 쿠키 세션 유지용
+          })
+            .then(response => {
+              if (response.redirected) {
+                window.location.href = response.url; // 서버가 리다이렉트 하면 따라감
+              } else {
+                // 필요시 다른 처리
+                alert('로그아웃 처리 완료');
+              }
+            })
+            .catch(err => {
+              console.error('로그아웃 실패:', err);
+            });
+        }
+      </script>
+      <!-- 선택된 채팅방이 있을 경우 -->
+      {% if selected_chat %}
+      <div class="chat-container">
+        <div class="chat-header">
+          <h4>{{ selected_chat.name }}</h4>
+          {% if is_admin %}
+          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addMemberModal">
+            <i class="fas fa-user-plus"></i> 멤버 추가
+          </button>
+          {% endif %}
+        </div>
+
+        <!-- 멤버 목록 (비공개 채팅방만 표시) -->
+        {% if selected_chat.is_private %}
+        <div class="member-list-toggle">
+          <button id="toggleMemberBtn" class="btn btn-outline-secondary" type="button" onclick="toggleMemberList()">
+            멤버 목록 보기
+          </button>
+
+          <div id="memberListContainer" class="member-list" style="display: none;">
+            <h5>멤버 목록</h5>
+            <ul>
+              {% for member in selected_chat.members %}
+              <li>
+                {{ member.username }}
+                {% if member.id == selected_chat.creator_id %} (생성자){% endif %}
+                {% if is_admin and member.username != username %}
+                <button class="btn btn-sm btn-danger" onclick="removeMember({{ member.id }})">제거</button>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMemberModal">
+              멤버 추가하기
+            </button>
+          </div>
+        </div>
+        {% endif %}
+
+        <script>
+          function toggleMemberList() {
+            const list = document.getElementById('memberListContainer');
+            const btn = document.getElementById('toggleMemberBtn');
+            const isVisible = list.style.display === 'block';
+
+            list.style.display = isVisible ? 'none' : 'block';
+            btn.textContent = isVisible ? '멤버 목록 보기' : '멤버 목록 닫기';
+          }
+        </script>
+
+
+        <!-- 메시지 영역 -->
+        <div class="member-lists-container"></div>
+        <div class="messages" id="chat-box">
+          {% for message in messages %}
+          <strong>{{ message.sender.username }}</strong> {{ message.content }}
+
+          <small style="float: right;">{{ message.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+        </div>
+        {% else %}
+        <p class="text-muted">메시지가 없습니다. 대화를 시작해보세요!</p>
+        {% endfor %}
+      </div>
+
+
+      <!-- 메시지 입력 폼 -->
+      <div class="chat-input">
+        <input type="text" id="message-input" placeholder="메시지를 입력하세요..." autocomplete="off">
+        <button id="send-button">전송</button>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-chat">
+      <h4>채팅방을 선택하세요</h4>
+      <p>왼쪽에서 기존 채팅방을 선택하거나 새로운 채팅방을 생성하세요.</p>
+    </div>
+    {% endif %}
+    </main>
+  </div>
+  </div>
+
+  <!-- 새 채팅방 생성 모달 -->
+  <div class="modal fade" id="newChatModal" tabindex="-1" style="color: #303844;">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">새 채팅 생성</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form action="{{ url_for('add_chat') }}" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="modal-body">
+            <div class="mb-3">
+              <label for="chat_name" class="form-label">채팅 이름</label>
+              <input type="text" class="form-control" id="chat_name" name="chat_name" required>
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="is_private" name="is_private">
+              <label class="form-check-label" for="is_private">비공개 채팅방</label>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+            <button type="submit" class="btn btn-primary">생성</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 멤버 추가 모달 -->
+  <div class="modal fade" id="addMemberModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">멤버 추가</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="addMemberForm">
+          <div class="modal-body">
+            <div class="mb-3">
+              <label for="new_member" class="form-label">사용자 이름</label>
+              <input type="text" class="form-control" id="new_member" name="username" required>
+              <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const currentChatId = urlParams.get('chat_id');
+                  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+                  const addMemberForm = document.getElementById('addMemberForm');
+                  const addMemberModalEl = document.getElementById('addMemberModal');
+                  const addMemberModal = bootstrap.Modal.getOrCreateInstance(addMemberModalEl);
+
+                  addMemberForm.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+
+                    if (!currentChatId) {
+                      alert('현재 채팅방 ID를 찾을 수 없습니다.');
+                      return;
+                    }
+
+                    const formData = new FormData(addMemberForm);
+                    const username = formData.get('username');
+                    if (!username) return;
+
+                    try {
+                      const response = await fetch(`/chat/${currentChatId}/add_member`, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                          'X-CSRFToken': csrfToken,
+                          'X-Requested-With': 'XMLHttpRequest'
+                        }
+                      });
+
+                      if (response.ok) {
+                        addMemberModal.hide();
+                        addMemberForm.reset();
+                        alert('멤버가 성공적으로 추가되었습니다.');
+                      } else {
+                        const errorText = await response.text();
+                        alert('멤버 추가 실패: ' + errorText);
+                      }
+                    } catch (error) {
+                      console.error('멤버 추가 에러:', error);
+                      alert('서버 요청 중 오류가 발생했습니다.');
+                    }
+                    addMemberModal.hide();
+
+                    // 강제로 body 클래스 제거
+                    document.body.classList.remove('modal-open');
+
+                    // 남아있는 백드롭 제거
+                    const backdrop = document.querySelector('.modal-backdrop');
+                    if (backdrop) {
+                      backdrop.parentNode.removeChild(backdrop);
+                    }
+                  });
+                });
+
+
+              </script>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+            <button type="submit" class="btn btn-primary">추가</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      let currentChatId = null;
+      let socket = null;
+      let isTyping = false;
+      let typingTimeout = null;
+
+      function formatTime(time) {
+        const date = new Date(time);
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        return `${hours}:${minutes}`;
+      }
+
+      function scrollToBottom() {
+        const chatBox = document.getElementById('chat-box');
+        if (!chatBox) return;
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      function showEmptyChatState() {
+        const chatBox = document.getElementById('chat-box');
+        if (!chatBox) return;
+        chatBox.innerHTML = '<p class="empty-message">채팅 메시지가 없습니다.</p>';
+      }
+      function showToast(message, type = 'info') {
+        //alert(`${type.toUpperCase()}: ${message}`);
+        //loadChatMessages(currentChatId);
+      }
+
+
+      function hideTypingIndicator() {
+        const typingDiv = document.querySelector('.typing-indicator');
+        if (typingDiv) {
+          typingDiv.remove();
+        }
+
+        isTyping = false;
+        if (typingTimeout) {
+          clearTimeout(typingTimeout);
+          typingTimeout = null;
+        }
+      }
+
+      function getCurrentUsername() {
+        const metaUsername = document.querySelector('meta[name="username"]')?.content;
+        if (metaUsername) return metaUsername;
+
+      }
+
+
+      function loadInitialData() {
+        console.log('Loading initial data...');
+        const urlParams = new URLSearchParams(window.location.search);
+        currentChatId = urlParams.get('chat_id');
+
+        if (currentChatId) {
+          joinChatRoom(currentChatId);
+          loadChatMessages(currentChatId);
+        } else {
+          showEmptyChatState();
+        }
+      }
+
+      function joinChatRoom(chatId) {
+        console.log('Joining chat room:', chatId);
+        if (socket && socket.connected) {
+          socket.emit('join_chat', { chat_id: chatId });
+        }
+      }
+
+      function loadChatMessages(chatId) {
+        console.log('Loading messages for chat:', chatId);
+        fetch(`/api/chat/${chatId}/messages`)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Network response was not ok');
+            }
+            if (response.status === 403) { alert("접근 권한이 없습니다."); throw new Error('Forbidden'); }
+            return response.json();
+          })
+          .then(data => {
+            const chatBox = document.getElementById('chat-box');
+            if (!chatBox) return;
+
+            chatBox.innerHTML = '';
+
+            if (data.messages && data.messages.length > 0) {
+              data.messages.forEach(msg => {
+                addMessageToChat(msg.content, msg.sender, msg.timestamp, false);
+              });
+            } else {
+              showEmptyChatState();
+            }
+
+          })
+          .catch(error => {
+            console.error('Error loading messages:', error);
+            showToast('메시지를 불러오는 중 오류가 발생했습니다', 'error');
+          });
+      }
+
+      function setupEventListeners() {
+        console.log('Setting up event listeners...');
+        const sendButton = document.getElementById('send-button');
+        const messageInput = document.getElementById('message-input');
+        const chatItems = document.querySelectorAll('.chat-item');
+
+        if (sendButton) {
+          sendButton.addEventListener('click', sendMessage);
+        }
+
+        if (messageInput) {
+          messageInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          });
+
+          messageInput.addEventListener('input', function () {
+            if (socket?.connected && currentChatId) {
+              handleTyping();
+            }
+          });
+        }
+
+        if (chatItems) {
+          chatItems.forEach(item => {
+            item.addEventListener('click', function () {
+              const chatId = this.dataset.chatId;
+              changeChat(chatId);
+            });
+          });
+        }
+
+        window.addEventListener('popstate', function () {
+          const urlParams = new URLSearchParams(window.location.search);
+          const chatId = urlParams.get('chat_id');
+          if (chatId) {
+            changeChat(chatId);
+          }
+        });
+      }
+
+      function initializeSocket() {
+        if (socket) {
+          socket.disconnect();
+        }
+
+        socket = io.connect(window.location.origin, {
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          transports: ['polling'],
+          upgrade: false
+        });
+
+        socket.on('connect', function () {
+          console.log('Socket connected:', socket.id);
+          if (currentChatId) {
+            socket.emit('join_chat', { chat_id: currentChatId });
+          }
+          loadInitialData();
+        });
+
+        socket.on('disconnect', function (reason) {
+          console.log('Socket disconnected:', reason);
+          if (reason === 'io server disconnect') {
+            socket.connect();
+          }
+        });
+
+
+        socket.on('new_message', function (data) {
+          console.log("📥 new_message 수신:", data);
+          if (String(data.chat_id) === currentChatId) {
+            addMessageToChat(data.message, data.sender, data.timestamp, false);
+            //updateChatLastMessage(data.chat_id, data.message, data.timestamp);
+            scrollToBottom()
+          } else {
+            showNewMessageNotification(data.chat_id, data.sender, data.message);
+          }
+        });
+
+        socket.on('typing', function (data) {
+          if (data.chat_id === currentChatId && data.sender !== getCurrentUsername()) {
+            showTypingIndicator(data.sender);
+          }
+        });
+
+
+        socket.on('stop_typing', function (data) {
+          if (data.chat_id === currentChatId) {
+            hideTypingIndicator();
+          }
+        });
+
+        socket.on('chat_update', function (data) {
+          if (data.chat_id === currentChatId) {
+            refreshChatMessages();
+          }
+        });
+
+        socket.on('error', function (err) {
+          console.error('Socket error:', err);
+          showToast('연결 오류가 발생했습니다: ' + err.message, 'error');
+        });
+
+        socket.on('reconnect_attempt', () => {
+          console.log('Reconnection attempt');
+        });
+
+        socket.on('reconnect', (attempt) => {
+          console.log(`Reconnected after ${attempt} attempts`);
+        });
+
+        socket.on('reconnect_failed', () => {
+          console.log('Reconnection failed');
+          showToast('서버와의 연결이 끊어졌습니다. 새로고침 해주세요.', 'error');
+        });
+      }
+
+      function showNewMessageNotification(chatId, sender, message) {
+        const chatItem = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`);
+        if (chatItem) {
+          chatItem.classList.add('new-message');
+
+          let badge = chatItem.querySelector('.unread-badge');
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'unread-badge';
+            chatItem.appendChild(badge);
+          }
+
+          if (Notification.permission === 'granted') {
+            new Notification(`${sender}님의 새 메시지`, {
+              body: message.length > 30 ? message.substring(0, 30) + '...' : message,
+              icon: '/static/images/notification-icon.png'
+            });
+          }
+        }
+      }
+
+      async function sendMessage() {
+        const messageInput = document.getElementById('message-input');
+        const message = messageInput.value.trim();
+
+        if (!message || !currentChatId) return;
+
+        messageInput.value = '';
+        hideTypingIndicator();
+
+        const sendButton = document.getElementById('send-button');
+        const originalText = sendButton.innerHTML;
+        sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        sendButton.disabled = true;
+
+        try {
+          const tempId = 'temp-' + Date.now();
+          addMessageToChat(message, getCurrentUsername(), new Date(), true, tempId);
+
+          if (socket?.connected) {
+            socket.emit('send_message', {
+              message: message,
+              chat_id: currentChatId,
+              temp_id: tempId
+            }, (response) => {
+              if (response && response.success) {
+                const tempMsg = document.querySelector(`[data-temp-id="${tempId}"]`);
+                if (tempMsg) {
+                  tempMsg.dataset.tempId = '';
+                  tempMsg.dataset.messageId = response.message_id;
+
+                }
+              } else {
+                const errorMsg = (response && response.error) ? response.error : '알 수 없는 오류';
+                const tempMsg = document.querySelector(`[data-temp-id="${tempId}"]`);
+                if (tempMsg) tempMsg.remove();
+                showToast('메시지 전송 실패: ' + errorMsg, 'error');
+              }
+            });
+
+
+          } else {
+
+            const response = await fetch('/api/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+              },
+              body: JSON.stringify({
+                message: message,
+                chat_id: currentChatId
+              })
+            });
+
+            const data = await response.json();
+            if (!data.success) {
+              const tempMsg = document.querySelector(`[data-temp-id="${tempId}"]`);
+              if (tempMsg) tempMsg.remove();
+              throw new Error(data.error || '메시지 전송 실패');
+            }
+          }
+        } catch (error) {
+          console.error('메시지 전송 실패:', error);
+          showToast('메시지 전송에 실패했습니다: ' + error.message, 'error');
+        } finally {
+          sendButton.innerHTML = originalText;
+          sendButton.disabled = false;
+        }
+        scrollToBottom();
+      }
+
+      function addMessageToChat(content, sender, timestamp, isOwnMessage = false) {
+        const chatBox = document.getElementById('chat-box');
+        if (!chatBox) return;
+
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message');
+
+        if (sender === currentUsername) {
+          messageDiv.classList.add('my-message');
+        } else {
+          messageDiv.classList.add('other-message');
+        }
+
+        messageDiv.innerHTML = `
+            <strong>${sender}</strong> ${escapeHtml(content)}
+            <div class="timestamp">${new Date(timestamp).toLocaleTimeString()}</div>
+        `;
+        chatBox.appendChild(messageDiv);
+      }
+
+
+
+
+
+
+
+
+
+      function formatMessageContent(message) {
+        if (!message) return '';
+
+        const urlRegex = /(\b(https?|ftp|file):\/\/[-\w+&@#/%?=~|!:,.;]*[-\w+&@#/%=~|])/ig;
+        message = message.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+        const emailRegex = /(\b[\w.-]+@[\w.-]+\.\w{2,}\b)/ig;
+        message = message.replace(emailRegex, '<a href="mailto:$1">$1</a>');
+
+        const emojiMap = {
+          ':)': '😊',
+          ':(': '😞',
+          ':D': '😃',
+          ':P': '😛',
+          ';)': '😉',
+          '<3': '❤️',
+          ':O': '😮'
+        };
+
+        Object.entries(emojiMap).forEach(([key, value]) => {
+          const regex = new RegExp(escapeRegExp(key), 'g');
+          message = message.replace(regex, value);
+        });
+
+        message = message.replace(/\n/g, '<br>');
+
+        return message;
+      }
+
+      function handleTyping() {
+        if (!socket || !socket.connected || !currentChatId) return;
+
+        if (!isTyping) {
+          isTyping = true;
+          socket.emit('typing', { chat_id: currentChatId });
+        }
+
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+          isTyping = false;
+          socket.emit('stop_typing', { chat_id: currentChatId });
+        }, 2000);
+      }
+
+      function escapeHtml(unsafe) {
+        return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+
+      function getCSRFToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.content || '';
+      } 
+
+      initializeSocket();
+      setupEventListeners();
+
+      if (window.Notification && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
+
+      const messageInput = document.getElementById('message-input');
+      if (messageInput) {
+        messageInput.focus();
+      }
+      scrollToBottom();
+    });
+
+  </script>
+  <script>
+    const currentUsername = "{{ username }}";
+  </script>
+  <script>
+    if (window.innerWidth <= 768) {  // 768px 이하를 모바일로 간주
+      window.location.href = "/moi";
+    }
+  </script>
+</body>
+
+</html>

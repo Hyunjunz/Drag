@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원가입</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4e73df;
+            --primary-hover: #2e59d9;
+            --secondary-color: #f8f9fc;
+            --text-color: #5a5c69;
+        }
+
+        body {
+            background-color: var(--secondary-color);
+            padding-top: 5rem;
+            color: var(--text-color);
+            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .register-card {
+            max-width: 450px;
+            margin: 0 auto;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            border-radius: 0.35rem;
+            border: none;
+        }
+
+        .card-header {
+            background-color: var(--primary-color);
+            color: white;
+            text-align: center;
+            font-weight: 600;
+            border-radius: 0.35rem 0.35rem 0 0 !important;
+            padding: 1.5rem;
+        }
+
+        .form-control {
+            padding: 0.75rem 1rem;
+            border-radius: 0.35rem;
+            border: 1px solid #d1d3e2;
+        }
+
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25);
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            padding: 0.75rem;
+            font-weight: 600;
+            border-radius: 0.35rem;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+            border-color: var(--primary-hover);
+        }
+
+        .form-check-input:checked {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .license-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .license-link:hover {
+            text-decoration: underline;
+        }
+
+        .login-link {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            color: #b7b9cc;
+            margin: 1.5rem 0;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid #e3e6f0;
+        }
+
+        .divider::before {
+            margin-right: 1rem;
+        }
+
+        .divider::after {
+            margin-left: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card register-card">
+            <div class="card-header">
+                <h4>새 계정 만들기</h4>
+            </div>
+            <div class="card-body p-5">
+                <form id="registerForm" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                    <div class="mb-4">
+                        <label for="username" class="form-label">사용자명</label>
+                        <input type="text" class="form-control" id="username" name="username" placeholder="사용자명을 입력하세요"
+                            required>
+                        <div class="form-text">영문, 숫자 조합 4-20자</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="password" class="form-label">비밀번호</label>
+                        <input type="password" class="form-control" id="password" name="password"
+                            placeholder="비밀번호를 입력하세요" required>
+                        <div class="form-text">8자 이상, 특수문자 포함</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="password-confirm" class="form-label">비밀번호 확인</label>
+                        <input type="password" class="form-control" id="password-confirm" name="password-confirm"
+                            placeholder="비밀번호를 다시 입력하세요" required>
+                        <div id="passwordMatch" class="form-text text-danger d-none">비밀번호가 일치하지 않습니다.</div>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" id="agreeLicense" required>
+                        <label class="form-check-label" for="agreeLicense">
+                            <a href="/license-DCLA" class="license-link">라이선스</a>에 동의합니다
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 mb-3 py-3">
+                        가입 완료
+                    </button>
+
+                    <div class="divider">또는</div>
+
+                    <div class="text-center">
+                        이미 계정이 있으신가요? <a href="/login" class="login-link">로그인</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        const form = document.getElementById("registerForm");
+        const password = document.getElementById("password");
+        const confirmPassword = document.getElementById("password-confirm");
+        const passwordMatch = document.getElementById("passwordMatch");
+        const username = document.getElementById("username");
+
+
+        function showMessage(msg) {
+            messageBox.textContent = msg;
+            messageBox.classList.remove("d-none");
+        }
+
+        function validateUsername(name) {
+            return /^[a-zA-Z0-9]{4,20}$/.test(name);
+        }
+
+        function validatePassword(pw) {
+            return pw.length >= 8 && /[^A-Za-z0-9]/.test(pw);
+        }
+
+        form.addEventListener("submit", function (e) {
+            // 사용자명 유효성
+            if (!validateUsername(username.value)) {
+                showMessage("사용자명은 영문과 숫자 조합으로 4~20자여야 합니다.");
+                e.preventDefault();
+                return;
+            }
+
+            // 비밀번호 유효성
+            if (!validatePassword(password.value)) {
+                showMessage("비밀번호는 8자 이상이며 특수문자를 포함해야 합니다.");
+                e.preventDefault();
+                return;
+            }
+
+            // 비밀번호 일치 확인
+            if (password.value !== confirmPassword.value) {
+                passwordMatch.classList.remove("d-none");
+                e.preventDefault();
+                return;
+            } else {
+                passwordMatch.classList.add("d-none");
+            }
+
+            // 라이선스 동의 확인
+            const licenseChecked = document.getElementById("agreeLicense").checked;
+            if (!licenseChecked) {
+                showMessage("라이선스에 동의해야 가입이 가능합니다.")
+                e.preventDefault();
+                return;
+            }
+        });
+
+        // 실시간 비밀번호 일치 확인
+        confirmPassword.addEventListener("input", () => {
+            if (password.value !== confirmPassword.value) {
+                passwordMatch.classList.remove("d-none");
+            } else {
+                passwordMatch.classList.add("d-none");
+            }
+        });
+
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
