@@ -23,15 +23,32 @@ A full-featured real-time chat application built using Flask and Flask-SocketIO 
 
 ## 📂 Folder Structure
 ```
- chat_project/
-├── main.py # Main Flask app
-├── static/ # Static files (CSS/JS)
-│ ├── style.css
-│ ├── profile.js
-├── templates/ # HTML templates
-│ ├── (chat, login, home pages)
-├── requirements.txt # Python dependencies
+chat_project/
+├── main.py # Main Flask app executable
+├── static/ # Static files directory
+│ ├── style.css # CSS stylesheet
+│ ├── profileIMG/
+│ │ ├── default.png # Default user profile image
+
+├── templates/ # HTML templates (login, chat, home, etc.)
+│ ├── login.html
+│ ├── register.html
+│ ├── fd.html
+│ ├── mobile.html
+│ └── home.html
+├── requirements.txt # List of project dependencies
+
 ```
+
+
+## 🛣️ Future Plans
+
+- [ ] Profile picture upload feature
+- [ ] Show whether chat messages have been read
+- [ ] Chat room notification sound settings
+- [ ] Message deletion and editing feature
+- [ ] Admin-only chat room
+
 
 
 ## 한국어
@@ -60,6 +77,8 @@ chat_project/
 ├── main.py               # 메인 Flask 앱 실행 파일
 ├── static/               # 정적 파일 디렉토리
 │   ├── style.css         # CSS 스타일 시트
+│   ├── profileIMG/
+│   │   ├── default.png   # 기본 유저 프로필 이미지     
 ├── templates/            # HTML 템플릿 (로그인, 채팅, 홈 등)
 │   ├── login.html
 │   ├── register.html    
@@ -69,3 +88,11 @@ chat_project/
 ├── requirements.txt      # 프로젝트 의존성 목록
   ```
 
+
+## 🛣️ 향후 계획
+
+- [ ] 프로필 사진 업로드 기능
+- [ ] 채팅 메시지 읽음 여부 표시
+- [ ] 채팅방 알림 음 설정
+- [ ] 메시지 삭제 및 수정 기능
+- [ ] 관리자 전용 채팅방
